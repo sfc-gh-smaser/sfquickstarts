@@ -402,14 +402,11 @@ WHERE action != 'DELETE' group by ticker,position order by position,TOTAL_VALUE_
 ;
 ```
 You know to wait for the Lag by now, but you can refresh right away too:
-<<<<<<< HEAD
 ```
 alter DYNAMIC TABLE LIMIT_ORDERS_SUMMARY_DT refresh;
 ```
 Now, table is ready for queries and note it shows you the statistics on this refresh performed.
-=======
-alter DYNAMIC TABLE LIMIT_ORDERS_SUMMARY_DT refresh;
->>>>>>> 883882bd1e411b75d20b5d4a857015edbcb45460
+
 ```
 select * from LIMIT_ORDERS_SUMMARY_DT where position='LONG' order by TOTAL_VALUE_USD;;
 ```
