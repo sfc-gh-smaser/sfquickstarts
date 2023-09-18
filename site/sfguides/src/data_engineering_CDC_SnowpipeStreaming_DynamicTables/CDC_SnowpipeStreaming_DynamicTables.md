@@ -266,6 +266,12 @@ As you can see, it is very easy to work with Semi-Structured data.  Our upcoming
 ### c)  But There is More Than One Table in My Source System
 The CDC Agent could easily be capturing changes from more than one source table, lets prepare for that and write each dynamic table to only use the events received for our simulated Stock Limit Order stream.  These are the key fields to use:
 ```
+show channels in table ENG.CDC_STREAMING_TABLE;
+```
+
+### d)  We can also get metadata about the Client Channels
+Specifically the offset token identifying the source's indicator of the last successfully-committed row.
+```
 select distinct RECORD_CONTENT:transaction:schema::varchar,RECORD_CONTENT:transaction:table::varchar from CDC_STREAMING_TABLE;
 ```
 
@@ -396,10 +402,14 @@ WHERE action != 'DELETE' group by ticker,position order by position,TOTAL_VALUE_
 ;
 ```
 You know to wait for the Lag by now, but you can refresh right away too:
+<<<<<<< HEAD
 ```
 alter DYNAMIC TABLE LIMIT_ORDERS_SUMMARY_DT refresh;
 ```
 Now, table is ready for queries and note it shows you the statistics on this refresh performed.
+=======
+alter DYNAMIC TABLE LIMIT_ORDERS_SUMMARY_DT refresh;
+>>>>>>> 883882bd1e411b75d20b5d4a857015edbcb45460
 ```
 select * from LIMIT_ORDERS_SUMMARY_DT where position='LONG' order by TOTAL_VALUE_USD;;
 ```
