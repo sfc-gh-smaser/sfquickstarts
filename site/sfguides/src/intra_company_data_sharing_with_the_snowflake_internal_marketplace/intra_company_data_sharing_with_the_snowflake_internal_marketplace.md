@@ -3,7 +3,7 @@ id: internal_marketplace_intra_org_sharing
 summary: INTRA-COMPANY DATA SHARING WITH THE SNOWFLAKE INTERNAL MARKETPLACE
 categories: Data-Sharing
 environments: web
-status: Hidden
+status: Published
 feedback link: <https://github.com/Snowflake-Labs/sfguides/issues>
 tags: Summit HOL, Data Sharing, Marketplace, Snowflake Internal Marketplace, Data Mesh, Data Products
 
@@ -13,7 +13,7 @@ tags: Summit HOL, Data Sharing, Marketplace, Snowflake Internal Marketplace, Dat
 
 Duration: 5
 
-Sharing information between departments or business units ("domains") of a company is critical for success. Sharing and consuming data assets is more successful if data is shared as a product. A data product is a collection of related data objects plus metadata, such as a business description, ownership and contact information, service level objectives, data dictionary, and more.
+Sharing information between departments or business units ("domains") of a company is critical for success. Sharing and consuming data assets is more successful if data is shared as a product. A data product is a collection of related data objects plus metadata, such as a business description, ownership and contact information, service level objectives, data dictionary, and more. In a Data Mesh, data products are typically also subject to various data management and organizational principles.  
 
 **Snowflake Internal Marketplace** enables companies to publish documented and governed data products, so they are discoverable and understandable for data consumers. Optionally, data quality metrics and SLOs can be included to make the product more trustworthy. The marketplace also offers rich capabilities to manage access to data products and wrap detailed governance around them to control which consumers can use which data products or which parts of a data product.
 
@@ -23,7 +23,7 @@ Sharing information between departments or business units ("domains") of a compa
 ### What You’ll Learn
 
 - How to publish, share, discover, and consume data product with the Snowflake Internal Marketplace
-- How to setup profile for different business units that own the data products
+- How to setup profiles for different business units that own the data products
 - How to manage access to data products, including request & approval workflows 
 - How to configure governance polices for fine-grained access control of data products across business units
 
@@ -47,11 +47,11 @@ Duration: 15
 
 The setup instructions for this lab describe all the steps for you to create the 3 accounts, domain profiles, and roles shown in the diagram below.
 
-The internal marketplace exists by default. It does not need to be created. But, you will configure it with provider profiles for the different business units via the [organization account](https://docs.snowflake.com/en/user-guide/organization-accounts). The organization account is a recent Snowflake capability to optionally monitor and manage a set of a regular accounts.
+The internal marketplace exists by default. It does not need to be created. But, you will configure it with provider profiles for the different business units via the [organization account](https://docs.snowflake.com/en/user-guide/organization-accounts). The organization account is a recent Snowflake capability to optionally monitor and manage a set of regular accounts.
 
 ![LabScenario](assets/DemoScenario-and-Accounts.png)
 
-The setup has 6 steps:
+The setup follows these steps:
 - Step 1: Create a Snowflake trial account in a region of your choice
 - Step 2: Configure the first account and create two more accounts _in the same org_
 - Step 3: Configure the second account
@@ -68,22 +68,25 @@ For Steps 2 through 7 you can download [scripts here](https://github.com/Snowfla
 
 Sign up for a trial account [here](https://signup.snowflake.com/)
 
-- Choose any cloud provider and region
+- Choose a Cloud and Region. We recommend choosing one of these regions where this Quickstart and the very latest features have been tested:
+  - **Microsoft Azure:** North Europe (Ireland), Central US (Iowa), Canada Central (Toronto)
+  - **Amazon Web Services**: EU (Frankfurt), Canada (Central), Asia Pacific (Tokyo)
+  - **Google Cloud Platform**: Europe West (London), US Central (Iowa)
+
 - Choose **Enterprise Edition** or higher. (Standard Edition does not support the Internal Marketplace)
-- **Activate the account with admin user `sales_admin`**
+- Activate the account with an admin user name such as `admin`
   
-  - <mark>Note!</mark> The user `sales_admin` will be used throughout this lab!
-   Do not choose a different user name here.
+  - <mark>Note!</mark> Step 2 creates a `sales_admin` that will be used throughout this lab.
 
 
 ### Step 2: Configure the first account and create two more accounts _in the same org_
-- Login as `sales_admin` to your Primary Account from Step 1 and execute the following commands in a worksheet. 
+- Login as `admin` to your Primary Account from Step 1 and execute the following commands in a worksheet. 
 - In the first four commands, enter your own email, first name, last name and password - this variable will be reused in the code for creating users and accounts.
 - You can also download this SQL file and import it into Snowsight - [`STEP2_setup_primary_account.sql`](https://github.com/Snowflake-Labs/sfguide-intra-company-data-sharing-with-the-snowflake-internal-marketplace/blob/main/sql/STEP2_setup_primary_account.sql)
 
 ```sql
 -- Run this code in your PRIMARY Account
--- Make sure you update the four variables below (email_var, firstname_var and lastname_var)
+-- Make sure you update the four variables below (email_var, firstname_var, lastname_var, and pwd_var)
 
 USE ROLE accountadmin;
 
@@ -95,22 +98,35 @@ set lastname_var  = 'FILL_IN_YOUR_LAST_NAME';
 -- Use the same password for users in all accounts
 set pwd_var = 'FILL_IN_YOUR_PASSWORD';
 
-CREATE OR REPLACE WAREHOUSE compute_wh WAREHOUSE_SIZE=small INITIALLY_SUSPENDED=TRUE;
+CREATE OR REPLACE WAREHOUSE compute_wh WAREHOUSE_SIZE=xsmall INITIALLY_SUSPENDED=TRUE;
 GRANT ALL ON WAREHOUSE compute_wh TO ROLE public;
 
+--  Create a user and role for the sales domain:
+USE ROLE accountadmin;
 CREATE OR REPLACE ROLE sales_data_scientist_role;
-GRANT CREATE SHARE ON ACCOUNT                    TO ROLE sales_data_scientist_role;
-GRANT CREATE ORGANIZATION LISTING ON ACCOUNT     TO ROLE sales_data_scientist_role;
-GRANT MANAGE LISTING AUTO FULFILLMENT ON ACCOUNT TO ROLE sales_data_scientist_role;
-GRANT ROLE sales_data_scientist_role TO USER sales_admin;
 
 SET my_user_var = CURRENT_USER();
 ALTER USER identifier($my_user_var) SET DEFAULT_ROLE = sales_data_scientist_role;
 
+CREATE OR REPLACE USER sales_admin
+  PASSWORD = $pwd_var
+  LOGIN_NAME = sales_admin
+  DISPLAY_NAME = sales_admin
+  FIRST_NAME = $firstname_var
+  LAST_NAME = $lastname_var
+  EMAIL = $email_var
+  MUST_CHANGE_PASSWORD = FALSE
+  DEFAULT_WAREHOUSE = compute_wh
+  DEFAULT_ROLE = sales_data_scientist_role
+  COMMENT = 'Sales domain admin';
 
--- Next, create a user and role for the marketing domain
--- in the primary account:
+GRANT ROLE sales_data_scientist_role TO USER sales_admin;
+GRANT ROLE accountadmin              TO USER sales_admin;  -- for simplicity in this lab
+GRANT CREATE SHARE ON ACCOUNT                    TO ROLE sales_data_scientist_role;
+GRANT CREATE ORGANIZATION LISTING ON ACCOUNT     TO ROLE sales_data_scientist_role;
 
+
+-- Next, create a user and role for the marketing domain:
 USE ROLE accountadmin;
 CREATE OR REPLACE ROLE marketing_analyst_role;
 
@@ -127,15 +143,23 @@ CREATE OR REPLACE USER marketing_admin
   COMMENT = 'Marketing domain admin';
 
 GRANT ROLE marketing_analyst_role TO USER marketing_admin;
-GRANT CREATE SHARE ON ACCOUNT TO ROLE marketing_analyst_role;
-GRANT CREATE ORGANIZATION LISTING ON ACCOUNT TO ROLE marketing_analyst_role;
+GRANT CREATE SHARE ON ACCOUNT                    TO ROLE marketing_analyst_role;
+GRANT CREATE ORGANIZATION LISTING ON ACCOUNT     TO ROLE marketing_analyst_role;
+
+USE ROLE orgadmin;
+GRANT MANAGE LISTING AUTO FULFILLMENT ON ACCOUNT TO ROLE sales_data_scientist_role;
+GRANT MANAGE LISTING AUTO FULFILLMENT ON ACCOUNT TO ROLE marketing_analyst_role;
 ```
 
-Check your email inbox for a message from "Snowflake Computing" and validate the email for the `marketing_admin` user. 
+> aside negative
+> IMPORTANT: You **may** receive an email asking for verification of your email address, if you have not done so before. Check your email inbox for a message from "Snowflake Computing" and validate the email for the `marketing_admin` user. 
 
 While waiting for the email, you can go ahead and run the following parts.
 
-Now, run the following commands to create the next two accounts that you need. You have to **use the same worksheet** as above, as the variables created are reused.
+Now, run the following commands to create the next two accounts that you need. 
+
+> aside negative
+> IMPORTANT: For the commands below, you **have to use the same worksheet** as above, as the variables created are reused (email_var, firstname_var, lastname_var, and pwd_var).
 
 ```sql
 -- Run this code in your PRIMARY account
@@ -169,7 +193,7 @@ SHOW ACCOUNTS;
 
 - Make a note of your account names, URLs, and passwords!
 - Copy or bookmark the account URLs returned by `SHOW ACCOUNTS'. 
-- When you click on one these URLs you are automatically directed to the respective account for login.
+- When you click on one of these URLs you are automatically directed to the respective account for login.
 
 
 
@@ -185,11 +209,11 @@ In a separate browser tab, log in to the account you created in step 1 (`HOL_ACC
 
 USE ROLE accountadmin;
 
-CREATE OR REPLACE WAREHOUSE compute_wh WAREHOUSE_SIZE=small INITIALLY_SUSPENDED=TRUE;
+CREATE OR REPLACE WAREHOUSE compute_wh WAREHOUSE_SIZE=xsmall INITIALLY_SUSPENDED=TRUE;
 GRANT ALL ON WAREHOUSE compute_wh TO ROLE public;
 
 CREATE ROLE supply_chain_admin_role;
-GRANT ROLE accountadmin TO ROLE supply_chain_admin_role; 
+GRANT ROLE accountadmin TO ROLE supply_chain_admin_role; -- for simplicity in this lab
 GRANT ROLE supply_chain_admin_role TO USER supply_chain_admin;
 
 ALTER USER supply_chain_admin 
@@ -239,16 +263,19 @@ SHOW ACCOUNTS;
 -- Make a note of your account names, URLs, and passwords!
 ```
 
+![Import](assets/show_accounts.png)
 
 
 ### Step 5: Create profiles for the Sales, Marketing, and Supply Chain domains
 Continue working as the `org_admin` user in your Organization Account `HOL_ORG_ACCOUNT` to create data provider profiles. You will set up profiles for 3 business domains: **Sales**, **Marketing**, and **Supply chain**.
 
 - Download the script [`STEP5(HOL_ORG_ACCOUNT)_create_org_profiles.sql`](https://github.com/Snowflake-Labs/sfguide-intra-company-data-sharing-with-the-snowflake-internal-marketplace/blob/main/sql/STEP5(HOL_ORG_ACCOUNT)_create_org_profiles.sql)
-- In that script, replace the dummy email **youremail@whatever.com** with your actual email address so that you  receive access request notifications for your data product. 
+- In that script, replace the dummy email **youremail@whatever.com** with your actual email address so that you  receive access request notifications for your data product. See the image below for more details.
   - Don't worry: it's only a couple of emails and only during this lab.
 
 - Run the downloaded script `STEP5(HOL_ORG_ACCOUNT)_create_org_profiles.sql` in a worksheet.
+
+![Import](assets/ReplaceEmail.png)
 
 ### Step 6: Setup of a TPC-H sample database
 - Download the script [`STEP6(HOL_ACCOUNT1)_create_lab_database.sql`](https://github.com/Snowflake-Labs/sfguide-intra-company-data-sharing-with-the-snowflake-internal-marketplace/blob/main/sql/STEP6(HOL_ACCOUNT1)_create_lab_database.sql) 
@@ -273,47 +300,53 @@ Continue working as the `org_admin` user in your Organization Account `HOL_ORG_A
 
 Duration: 30
 
-In this section you will work in `HOL_ACCOUNT1` create and publish an [organizational listing](https://docs.snowflake.com/en/user-guide/collaboration/listings/organizational/org-listing-about). 
+In this section you will work in `HOL_ACCOUNT1` to create and publish an [organizational listing](https://docs.snowflake.com/en/user-guide/collaboration/listings/organizational/org-listing-about). 
+
+The publishing flow consists of 5 steps:
+
+1. Listing Title and Ownership
+2. Selecting Data Objects to Share
+3. Configure Access Control and the Approval Process
+4. Add Optional Metadata and SLOs
+5. Publish your listing to the internal marketplace
 
 Login in to `HOL_ACCOUNT1` as user `sales_admin`.
 
-### Publishing Flow: Listing Title and Ownership
+### Publishing Flow (Step 1 of 5): Listing Title and Ownership
 
-1. Navigate to the Provider Studio and click the blue **+Create Listing** button in the top right. Select "Internal Marketplace".
+1. Navigate to the Provider Studio and click the blue **+Create Listing** button in the top right. 
+2. Select **"Internal Marketplace"**.
 
-![ProviderStudio](assets/ProviderStudio.png)
-###
----
-2. Give your data product a meaningful title. Let's use **Order Insights** in this lab. Click "Save".
+![IM](assets/ProviderStudio.png)
+
+3. Click on **“Untitled Listing”** and give your data product a meaningful title. Let's use **Order Insights** in this lab. Click "Save".
+
+> aside positive
+> IMPORTANT: some code later in this lab will reference the listing by the name **Order Insights**. 
 
 ![](assets/Publish01-Title.png)
-###
----
-3. Click on the **+Profile** button and select the **Sales** profile as the owner of this data product. 
+
+4. Click on the **+Profile** button and select the **Sales** profile as the owner of this data product. 
 
 ![](assets/Publish02-Profile.png)
 
 - When you save the profile selection, note that the contact email from the Sales profile is automatically entered as the default support contact for this listing. You can change this on a per listing basis if you want. 
-###
----
 
-### Publishing Flow: Selecting Data Objects to Share
+### Publishing Flow Step (2 of 5): Selecting Data Objects to Share
 
 Now let's select the data objects that we want to share in this data product. 
-- Click on the blue **+Add Data Product** button to open the object explorer. 
+- Click on the blue **Add Data Product** button to open the object explorer. 
 
 - Then, click **+ Select**, navigate to the SF1 schema of the TPCH database, and select all tables except *Region* and *Part*. Also select the ORDER_SUMMARY view and the  function ORDERS_PER_CUSTOMER. Click **Done** and **Save**.
 
 ![](assets/Publish03-ObjectSelection.png)
 
-###
----
-### Publishing Flow: Configure Access Control and the Approval Process
+### Publishing Flow (Step 3 of 5): Configure Access Control and the Approval Process
 
 Next you set the access control for the data product. Click on the gray **+Access Control** button. 
 - *Discovery* determines who can see the listing and all its metadata in the internal marketplace without having access to the shared data objects.
 - *Access* specifies who can discover the listing *and* access the shared data objects. 
-###
+
 For this first data product we keep it simple and stick with the defaults:
 
 - *Grant Access*: No accounts or roles are pre-approved
@@ -329,13 +362,11 @@ You could configure an external workflow engine for the request approval process
 
 After you confirm the approval flow settings, Snowflake prompts you for one more configuration. Here is why: this listing is configured to be discoverable by the entire organization. What if you add another account to the organization but in a different cloud region? Then Snowflake would transparently perform incremental replication to that region to minimize egress cost. As the data provider you can choose the frequency of this replication.
 
-So lets (1) **Review** the settings, (2) accept the default of daily replication, and then (3) **Save** the settings for this listing:
+So lets (1) **Review** the settings, (2) Change the replication interval to daily (1 Days), and then (3) **Save** the settings for this listing:
 
 ![](assets/Publish06-LAF.png)
 
-###
----
-### Publishing Flow: Add Optional Metadata and SLOs
+### Publishing Flow (Step 4 of 5): Add Optional Metadata and SLOs
 Data products should be understandable and trustworthy for data consumers so let's add additional metadata to describe the product (see screenshot below).
 
 - Add a business **description** to document your listing.
@@ -348,24 +379,32 @@ Data products should be understandable and trustworthy for data consumers so let
   - **Geographic Coverage**: The regions you will share this data product to, if your company uses Snowflake in multiple regions.
   - **Time Range**: Amount of history data included.
   - **Timestamp Granularity**: The interval between data points. For example, "*Event-based*" if there is one record for each incoming order, or "*Daily*" if order volumes are aggregated by date, and so on.
-    
-- Add at least two **Usage examples** such as these:
-    ```sql
+  
+  ![](assets/Publish07-MetaData.png)
+
+
+- Add at least two **Usage examples** such as the following two queries.
+  - Note: Queries reference objects in a data product via the [Uniform Listing Locator (ULL)](https://docs.snowflake.com/en/user-guide/collaboration/listings/organizational/org-listing-query).
+  - The ULL of your **Order Insights** listing is `ORGDATACLOUD$SALES$ORDER_INSIGHTS`.
+  - The ULL contains the domain profile name and listing name. Schema name and object name can be appended to reference objects within the listing, as in the two queries below.
+  - The ULL can be copied from the top of the listing page, right under the listing name.
+  
+  
+  ```sql
     -- Title: Explore the Order Summary View:
 
     SELECT * 
-    FROM TPCH.SF1.ORDER_SUMMARY 
+    FROM ORGDATACLOUD$SALES$ORDER_INSIGHTS.SF1.ORDER_SUMMARY 
     LIMIT 100;
 
 
     -- Title: Use the UDF to obtain order details for one customer:
 
     SELECT customer_name, country, orderkey, orderdate, AMOUNT
-    FROM TABLE(tpch.sf1.orders_per_customer(60001));
+    FROM TABLE(ORGDATACLOUD$SALES$ORDER_INSIGHTS.sf1.orders_per_customer(60001));
     ```
 
 
-![](assets/Publish07-MetaData.png)
 
 - Generate a **Data dictionary**. Snowflake will automatically compile column information and sample data for *all* objects in the data product.
 
@@ -374,19 +413,17 @@ Data products should be understandable and trustworthy for data consumers so let
 
 ![](assets/Publish08-DataDictionary.png)
 
-###
----
-### Publishing Flow: Publish your listing to the internal marketplace
+### Publishing Flow (Step 5 of 5): Publish your listing to the internal marketplace
 
 Click the blue **Publish** button in the top right corner.
 
-Your data product is now live! You can see it when you navigate to the Internal Marketplace:
+Your data product is now live! You can see it when you navigate to the Internal Marketplace.
 
-![](assets/Publish10-Done.png)
+- In the old UI, choose **Data Products** in the menu on the left, then **Marketplace**, then **Internal Marketplace** at the top.
+- In the new UI, choose **Catalog** in the menu on the left, then **Internal Marketplace** (see below).
+- Use the *Provider* filter to show listings for specific domains only.
 
-###
----
-
+![](assets/Publish10-Done-NewUI.png)
 
 ## Request and Grant Access
 
@@ -396,7 +433,7 @@ In this section you will request access to the new data product for the **Market
 
 ### Request Access
 
-- Log out of your account `HOL_ACCOUNT1` and log back in as the `marketing_admin` user.
+- Open a new browser tab and log in to the `HOL_ACCOUNT1` a s the `marketing_admin` user.
 - Navigate to the Internal Marketplace
 - Click on the **Order Insights** listing
 - Review all the listing elements from the data consumer point of view
@@ -434,17 +471,20 @@ Switch from **Needs Review** to **Resolved Requests** to see the history of requ
 
 Duration: 10
 
-Now that access has been granted let's go back to the consumer roles:
+Now that access has been granted, let's go back to the consumer roles:
 
 - In a separate browser tab log into `HOL_ACCOUNT2` as the `supply_chain_admin` user. *(Keep this tab alive for the rest of the lab.)*
 - In the Internal Marketplace open the **Order Insights** listing again
 - The blue **Request Access** button has now changed to **Query in Worksheet**. Reload the browser tab if needed to see the new button.
 - Click **Query in Worksheet**. Review and run the data product sample queries. *(Keep this tab alive for the rest of the lab.)*
+- Note the list of all available internal data products in the left-hand side of the UI.
 - In the SQL, note the ULL (Uniform Listing Locator) that references the data product.
   - The ULL contains the domain name, i.e. the name of the profile under which the listing was published.
   - The ULL also contains the listing name. 
   - Schema and object names are appended to access specific objects in the data product.
 - **Optional**: Log into account `HOL_ACCOUNT1` as the `marketing_admin` user and perform the same steps.
+
+![](assets/ConsumeListing.png)
 
 ---
 ## Live Data Sharing
@@ -463,20 +503,21 @@ in `HOL_ACCOUNT1`
   SELECT customer_name, country, orderkey, orderdate, AMOUNT
   FROM TABLE(orders_per_customer(60001));
   ```
-- Note that customer 60001 lives in Kenya. But, he has now moved to Mozambique which requires the following update:
+- Note that customer 60001 lives in Kenya. But, the customer has now moved to Mozambique, which requires the following update to the customer's nationkey:
 
   ```sql
-  -- Customer 60001 moves from Kenya to MOZAMBIQUE !
+  -- Customer 60001 moves from Kenya to Mozambique !
   UPDATE customer SET c_nationkey = 16 WHERE c_custkey = 60001;
   ```
 - Now switch to your browser tab where you are logged into `HOL_ACCOUNT2` as `supply_chain_admin`. In the worksheet "**Order Insights - Examples**" run the second sample query again:
 
   ```sql
-  // Use the UDF to obtain the order details for one customer
+  -- Use the UDF to obtain the order details for one customer
+
   SELECT customer_name, country, orderkey, orderdate, AMOUNT
   FROM TABLE(ORGDATACLOUD$SALES$ORDER_INSIGHTS.sf1.orders_per_customer(60001));
   ```
-- Note that the updated country information is instantly visible to data consumers!
+- Note that the updated country information,  inferred from the updated nationkey, is instantly visible to data consumers!
 - Other data product changes such as adding a column to a table would also be immediately reflected on the consumer side. 
 - **Best practice:** inform your data consumers of structural data product changes ahead of time.  In case of a breaking change consider creating a new listing "v2.0" and give data consumers time to migrate from the old to the new listing.
 
@@ -498,7 +539,7 @@ in `HOL_ACCOUNT1`
   use role sales_data_scientist_role;
 
   SELECT *
-  FROM order_summary; 
+  FROM order_summary 
   LIMIT 100;
   ```
 ### Row-level Access Control across Domains
@@ -583,7 +624,9 @@ Let's see how the Supply Chain and Marketing teams are affected by the new polic
 
 - Log into account `HOL_ACCOUNT1` as the `marketing_admin` user and execute the same query. 
   - You should see data for Canadian customers only.
-  
+  - The Order_Amount column should be masked for orders before 1996.  
+
+As soon as you remove roles or accounts, the listing is no longer accessible for this role and/or account.
 
 
 ## Basic Listing Management
@@ -616,7 +659,7 @@ In this section we will review further capabilities for managing and monitoring 
 ### How to Grant Listing Management Privileges
 
 - Navigate to the Provider Studio and open the **Order Insights** listing, if it is not still open from the previous exercise.
-- Click on the wheel in the top right corner.
+- Click on the three dots and **Open Settings** in the top right corner.
 - In the side panel you can now edit listing settings and privileges.
 - For example, you can authorize additional roles to *Modify* this listing and respond to access requests from data consumers:
 
@@ -634,6 +677,7 @@ As an organization admin you can query the [organization_usage.access_history](h
 
 ```sql
 use role globalorgadmin;
+use warehouse compute_wh;
 
 select q.account_name, 
     q.user_name, 

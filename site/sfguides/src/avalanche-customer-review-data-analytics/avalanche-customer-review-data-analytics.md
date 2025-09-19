@@ -7,7 +7,7 @@ status: Published
 feedback link: https://github.com/Snowflake-Labs/sfguides/issues
 tags: Data Analytics, Sentiment Analysis, Snowflake, Streamlit, Cortex, LLM, Data Visualization
 
-# Build a Customer Review Analytics Dashboard with Snowflake and Streamlit
+# Build a Customer Review Analytics Dashboard with Snowflake Cortex and Streamlit
 <!-- ------------------------ -->
 ## Overview
 Duration: 5
@@ -59,7 +59,7 @@ CREATE STAGE IF NOT EXISTS avalanche_db.avalanche_schema.customer_reviews
 ```
 
 You should see a confirmation message after a stage has been created succesfully:
-![image](assets/create-stage.PNG)
+![image](assets/create-stage.png)
 
 ### Upload data to stage
 Fourthly, download the Avalanche customer review data, which is comprised of customer reviews for a hypothetical winter sports gear company. The customer review data is in DOCX format and can is available as [customer_reviews_docx.zip](https://github.com/Snowflake-Labs/snowflake-demo-notebooks/blob/main/Avalanche-Customer-Review-Analytics/customer_reviews_docx.zip).
@@ -72,11 +72,11 @@ Then, in the top-right hand corner click on the blue "+ Files" button. Followed 
 
 You'll see a modal pop-up where you can upload the 100 DOCX files:
 
-![image](assets/upload-stage.PNG)
+![image](assets/upload-stage.png)
 
 Afterwards, you'll see the files listed in the main panel. Also make note of the previously mentioned hierarchical list of the database, schema and stage that we navigated through:
 
-![image](assets/upload-files.PNG)
+![image](assets/upload-files.png)
 
 
 ### List contents of a stage
@@ -90,12 +90,12 @@ Next, enter the following in a SQL worksheet:
 
 This should yield the following results output:
 
-![image](assets/list-stage.PNG)
+![image](assets/list-stage.png)
 
 
 <!-- ------------------------ -->
 ## Retrieving Customer Review Data
-Duration: 10
+Duration: 10 mins
 
 ### Extracting Data from DOCX Files
 
@@ -128,24 +128,27 @@ This query does the following:
 The `PARSE_DOCUMENT` function is particularly useful for extracting text from various document formats, including DOCX, PDF, and others. The "layout" mode preserves the document's structure, making it easier to extract specific sections.
 
 Running the above query should yield the following table output: 
-![image](assets/sql1.PNG)
+
+![image](assets/sql1.png)
 
 <!-- ------------------------ -->
 ## Reshaping the Data
-Duration: 15
+Duration: 15 mins
 
 ### Structuring the Extracted Content
 
-Now that we have the raw content from the DOCX files, we need to reshape it into a more structured format. We'll use regular expressions to extract specific information such as product name, date, and the customer review text.
+Now that we have the raw content from the .DOCX files, we need to reshape it into a more structured format. We'll use regular expressions to extract specific information such as product name, date, and the customer review text.
+
+👀 NOTE: Depends on the output from [this step](#retrieving-customer-review-data)
 
 ```sql
 -- Extract PRODUCT name, DATE, and CUSTOMER_REVIEW from the LAYOUT column
 SELECT 
   filename,
-  REGEXP_SUBSTR(layout, 'Product: (.*?) Date:', 1, 1, 'e') as product,
+  REGEXP_SUBSTR(layout, 'Product: (.*)', 1, 1, 'e', 1) as product,
   REGEXP_SUBSTR(layout, 'Date: (202[0-9]-[0-9]{2}-[0-9]{2})', 1, 1, 'e') as date,
-  REGEXP_SUBSTR(layout, '## Customer Review\n([\\s\\S]*?)$', 1, 1, 'es') as customer_review
-FROM previous_query_result;
+  REGEXP_SUBSTR(layout, '## Customer Review\\n\\n(.*)', 1, 1, 'e', 1) as customer_review
+FROM table(result_scan(last_query_id())); -- assuming you ran last query from Section 3
 ```
 
 This query uses `REGEXP_SUBSTR` to extract:
@@ -155,8 +158,38 @@ This query uses `REGEXP_SUBSTR` to extract:
 
 The regular expression patterns are designed to match the specific structure of the documents, extracting only the relevant information. This transformation converts unstructured text into a structured format that's easier to analyze.
 
+You can also combine this query into one combined query using [Snowflake's Flow Operator](https://docs.snowflake.com/en/sql-reference/operators-flow)
+
+It should look something like this
+
+**‼️ Please note, this is an alternate implementaiton on above code.**
+
+```sql
+WITH files AS (
+  SELECT 
+    REPLACE(REGEXP_SUBSTR(file_url, '[^/]+$'), '%2e', '.') as filename
+  FROM DIRECTORY('@avalanche_db.avalanche_schema.customer_reviews')
+  WHERE filename LIKE '%.docx'
+)
+SELECT 
+  filename,
+  SNOWFLAKE.CORTEX.PARSE_DOCUMENT(
+    @avalanche_db.avalanche_schema.customer_reviews,
+    filename,
+    {'mode': 'layout'}
+  ):content AS layout
+FROM files
+->> --Flow Operator
+SELECT 
+  filename,
+  REGEXP_SUBSTR(layout, 'Product: (.*)', 1, 1, 'e', 1) as product,
+  REGEXP_SUBSTR(layout, 'Date: (202[0-9]-[0-9]{2}-[0-9]{2})', 1, 1, 'e') as date,
+  REGEXP_SUBSTR(layout, '## Customer Review\\n\\n(.*)', 1, 1, 'e', 1) as customer_review
+FROM $1;
+```
 The result table should look like the following:
-![image](assets/sql2.PNG)
+
+![image](assets/sql2.png)
 
 ### Applying AI on the Data with Cortex
 
@@ -188,7 +221,8 @@ This query:
 The sentiment score is a numerical value that indicates the overall sentiment of the review, with positive values indicating positive sentiment and negative values indicating negative sentiment.
 
 Results from the query is shown below:
-![image](assets/sql3.PNG)
+
+![image](assets/sql3.png)
 
 ### Converting SQL Results to a Pandas DataFrame
 
@@ -200,7 +234,7 @@ df = sql_result.to_pandas()
 
 This conversion allows us to use Python's data visualization libraries to create interactive charts and graphs.
 
-![image](assets/df.PNG)
+![image](assets/df.png)
 
 <!-- ------------------------ -->
 ## Create Visualizations
@@ -250,7 +284,7 @@ This chart:
 - Includes tooltips that show the product name and date when hovering over a bar
 - Rotates date labels for better readability
 
-![image](assets/py_bar.PNG)
+![image](assets/py_bar.png)
 
 ### Calculate Product Sentiment Scores
 
@@ -291,7 +325,7 @@ This chart:
 - Uses the same color scheme as the previous chart
 - Includes tooltips that show the product name and average sentiment score
 
-![image](assets/py_product_sentiment.PNG)
+![image](assets/py_product_sentiment.png)
 
 ### Add Download Button
 
@@ -309,7 +343,7 @@ st.download_button(
 
 This button allows users to download a CSV file containing the product name, date, summary, and sentiment score for each review.
 
-![image](assets/py_download.PNG)
+![image](assets/py_download.png)
 
 
 <!-- ------------------------ -->
